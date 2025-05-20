@@ -1,76 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Detector CF700</title>
+  <title>Detección CJ700 en Vivo</title>
   <style>
-    body {
-      margin: 0;
-      background: black;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-    }
-    video {
-      width: 100%;
-      height: auto;
-      border: 2px solid #00ffcc;
-      border-radius: 12px;
-    }
+    body { font-family: sans-serif; padding: 10px; text-align: center; }
+    video, canvas { width: 100%; max-width: 480px; border-radius: 12px; }
+    #result { margin-top: 15px; background: #f4f4f4; padding: 10px; border-radius: 8px; font-size: 14px; }
   </style>
 </head>
 <body>
-  <video id="video" autoplay muted playsinline></video>
-
-  <!-- SDK CORRECTO -->
-  <script src="https://cdn.roboflow.com/0.2.26/roboflow.js"></script>
+  <h2>Detección en Vivo - Motor CJ700</h2>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas" style="display:none;"></canvas>
+  <div id="result">Esperando cámara...</div>
 
   <script>
-    const video = document.getElementById("video");
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const resultDiv = document.getElementById('result');
 
-    // Activar cámara
-    navigator.mediaDevices.getUserMedia({ video: true })
-      .then(stream => {
-        video.srcObject = stream;
-      })
-      .catch(err => {
-        console.error("Error accediendo a la cámara:", err);
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      video.srcObject = stream;
+
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
       });
+    }
 
-    // Esperar a que cargue la página
-window.onload = async () => {
-  console.log("Iniciando Roboflow...");
+    async function captureAndDetect() {
+      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        const formData = new FormData();
+        formData.append('image', blob, 'frame.jpg');
 
-  const rf = await roboflow.auth({
-    publishable_key: "Qj0G0aIWu17HtSpDZdMk"
-  });
+        // 1. Subir imagen a Roboflow para obtener una URL temporal
+        const uploadRes = await fetch('https://upload.roboflow.com?key=Qj0G0aIWu17HtSpDZdMk&name=frame', {
+          method: 'POST',
+          body: formData
+        });
 
-  console.log("Autenticado");
+        const uploadData = await uploadRes.json();
+        if (!uploadData.url) {
+          resultDiv.innerText = "Error al subir imagen.";
+          return;
+        }
 
-  const model = await rf.load({
-    model: "cf700",
-    version: 4
-  });
+        // 2. Enviar imagen al workflow
+        const detectRes = await fetch('https://serverless.roboflow.com/infer/workflows/cf700/detect-and-classify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            api_key: "Qj0G0aIWu17HtSpDZdMk",
+            inputs: {
+              image: { type: "url", value: uploadData.url }
+            }
+          })
+        });
 
-  console.log("Modelo cargado:", model);
+        const detectData = await detectRes.json();
+        resultDiv.innerText = JSON.stringify(detectData, null, 2);
+      }, 'image/jpeg');
+    }
 
-  await model.configure({
-    threshold: 0.5,
-    overlap: 0.5
-  });
-
-  console.log("Configuración completada");
-
-  setInterval(async () => {
-    const predictions = await model.detect(video);
-    console.clear();
-    console.log("Detecciones:", predictions);
-  }, 1000);
-};
-
+    // Configura la cámara y comienza detecciones periódicas
+    setupCamera().then(() => {
+      resultDiv.innerText = "Cámara activa. Detectando...";
+      setInterval(captureAndDetect, 4000); // cada 4 segundos
+    });
   </script>
 </body>
 </html>
