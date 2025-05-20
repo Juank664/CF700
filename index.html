@@ -120,6 +120,13 @@
             const modelFile = modelMap[label];
             if (modelFile && !shownModels.has(modelFile)) {
               const modelViewer = document.createElement('model-viewer');
+              <model-viewer src="combustion_section_ensamble_cut.gltf"
+              alt="Combustion Section"
+              auto-rotate
+              camera-controls
+              ar
+              style="width: 100%; height: 500px;">
+</model-viewer>
               modelViewer.setAttribute('src', modelFile);
               modelViewer.setAttribute('alt', label);
               modelViewer.setAttribute('auto-rotate', '');
