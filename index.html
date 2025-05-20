@@ -36,7 +36,7 @@
     const output = document.getElementById('output');
 
     // Acceder a la cámara
-    navigator.mediaDevices.getUserMedia({ video: true })
+    navigator.mediaDevices.getUserMedia({ video: {facingMode: "user" }})
       .then(stream => {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
