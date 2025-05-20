@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Detección en Vivo con Roboflow y Modelo 3D</title>
+  <title>Detección en Vivo con Roboflow y Múltiples Modelos</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
     video, canvas {
@@ -21,25 +21,30 @@
       position: relative;
       display: inline-block;
     }
-    #modelViewer {
-      width: 100%;
-      height: 500px;
+    #modelsContainer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
       margin-top: 20px;
+    }
+    model-viewer {
+      width: 300px;
+      height: 300px;
       border: 2px solid #444;
     }
     #output {
-      display: none; /* Ocultar JSON */
+      display: none; /* Ocultar salida JSON */
     }
   </style>
 </head>
 <body>
+  <h2>Modelos detectados</h2>
   <div id="videoWrapper">
     <video id="video" autoplay muted playsinline></video>
     <canvas id="overlay"></canvas>
   </div>
 
-  <!-- Visor del modelo GLB -->
-  <model-viewer id="modelViewer" src="" alt="Modelo 3D" auto-rotate camera-controls ar shadow-intensity="1" style="display: none;"></model-viewer>
+  <div id="modelsContainer"></div>
 
   <pre id="output"></pre>
 
@@ -47,7 +52,7 @@
     const video = document.getElementById('video');
     const overlay = document.getElementById('overlay');
     const output = document.getElementById('output');
-    const modelViewer = document.getElementById('modelViewer');
+    const modelsContainer = document.getElementById('modelsContainer');
 
     const modelMap = {
       "Accessory Drive Section": "ADS.glb",
@@ -60,7 +65,7 @@
       "Turbine": "Turbine.glb"
     };
 
-    let lastShownModel = null;
+    const shownModels = new Set(); // Para evitar duplicados
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
@@ -99,7 +104,6 @@
           });
 
           const data = await res.json();
-
           ctx.clearRect(0, 0, overlay.width, overlay.height);
           ctx.strokeStyle = 'lime';
           ctx.lineWidth = 2;
@@ -114,10 +118,17 @@
             ctx.strokeRect(left, top, width, height);
 
             const modelFile = modelMap[label];
-            if (modelFile && lastShownModel !== modelFile) {
-              modelViewer.src = modelFile;
-              modelViewer.style.display = 'block';
-              lastShownModel = modelFile;
+            if (modelFile && !shownModels.has(modelFile)) {
+              const modelViewer = document.createElement('model-viewer');
+              modelViewer.setAttribute('src', modelFile);
+              modelViewer.setAttribute('alt', label);
+              modelViewer.setAttribute('auto-rotate', '');
+              modelViewer.setAttribute('camera-controls', '');
+              modelViewer.setAttribute('ar', '');
+              modelViewer.setAttribute('shadow-intensity', '1');
+              modelsContainer.appendChild(modelViewer);
+
+              shownModels.add(modelFile);
             }
           });
 
