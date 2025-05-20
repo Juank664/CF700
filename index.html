@@ -35,15 +35,29 @@
     const overlay = document.getElementById('overlay');
     const output = document.getElementById('output');
 
+    // Mapeo de etiquetas a archivos GLB
+    const modelMap = {
+      "Accessory Drive Section": "ADS.glb",
+      "After Fan": "aft_ensamble.glb",
+      "Combustion Section": "combustion_section_ensamble_cut.glb",
+      "Compressor": "compressor_ensamble_cut.glb",
+      "Drive Shaft": null,
+      "Front Frame": "Front_frame_ensamble.glb",
+      "Fuel injector": null,
+      "Turbine": "Turbine.glb"
+    };
+
+    let openedModels = new Set(); // Para no abrir repetidamente el mismo modelo
+
     // Acceder a la cámara
-    navigator.mediaDevices.getUserMedia({ video: {facingMode: "environment"} })
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
           overlay.width = video.videoWidth;
           overlay.height = video.videoHeight;
           startDetection();
-        }
+        };
       })
       .catch(err => alert('Error al acceder a la cámara: ' + err));
 
@@ -53,7 +67,7 @@
     async function startDetection() {
       const ctx = overlay.getContext('2d');
       const offscreen = document.createElement('canvas');
-      const interval = 1000; // ms
+      const interval = 1500; // Tiempo entre inferencias (ms)
 
       offscreen.width = overlay.width;
       offscreen.height = overlay.height;
@@ -81,13 +95,19 @@
           ctx.font = '14px sans-serif';
           ctx.fillStyle = 'lime';
 
-          data?.predictions?.forEach(pred => {
+          (data?.predictions || []).forEach(pred => {
             const { x, y, width, height, class: label, confidence } = pred;
             const left = x - width / 2;
             const top = y - height / 2;
 
             ctx.strokeRect(left, top, width, height);
             ctx.fillText(`${label} (${(confidence * 100).toFixed(1)}%)`, left, top - 5);
+
+            const modelFile = modelMap[label];
+            if (modelFile && !openedModels.has(label)) {
+              openedModels.add(label);
+              window.open(modelFile, '_blank');
+            }
           });
 
         } catch (err) {
