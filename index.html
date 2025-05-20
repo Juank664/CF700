@@ -41,28 +41,36 @@
       });
 
     // Esperar a que cargue la página
-    window.onload = async () => {
-      const rf = await roboflow.auth({
-        publishable_key: "Qj0G0aIWu17HtSpDZdMk" // tu API Key
-      });
+window.onload = async () => {
+  console.log("Iniciando Roboflow...");
 
-      const model = await rf.load({
-        model: "cf700",  // tu model ID actualizado
-        version: 4       // versión actual
-      });
+  const rf = await roboflow.auth({
+    publishable_key: "Qj0G0aIWu17HtSpDZdMk"
+  });
 
-      await model.configure({
-        threshold: 0.5,
-        overlap: 0.5
-      });
+  console.log("Autenticado");
 
-      // Bucle de predicción
-      setInterval(async () => {
-        const predictions = await model.detect(video);
-        console.clear();
-        console.log("Detecciones:", predictions);
-      }, 1000); // cada 1 segundo
-    };
+  const model = await rf.load({
+    model: "cf700",
+    version: 4
+  });
+
+  console.log("Modelo cargado:", model);
+
+  await model.configure({
+    threshold: 0.5,
+    overlap: 0.5
+  });
+
+  console.log("Configuración completada");
+
+  setInterval(async () => {
+    const predictions = await model.detect(video);
+    console.clear();
+    console.log("Detecciones:", predictions);
+  }, 1000);
+};
+
   </script>
 </body>
 </html>
