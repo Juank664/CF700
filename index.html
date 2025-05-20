@@ -1,78 +1,101 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Detección CJ700 en Vivo</title>
+  <meta charset="UTF-8">
+  <title>Inferencia Roboflow en Vivo</title>
   <style>
-    body { font-family: sans-serif; padding: 10px; text-align: center; }
-    video, canvas { width: 100%; max-width: 480px; border-radius: 12px; }
-    #result { margin-top: 15px; background: #f4f4f4; padding: 10px; border-radius: 8px; font-size: 14px; }
+    video, canvas {
+      width: 300px;
+      border: 1px solid #ccc;
+      margin: 10px;
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #videoWrapper {
+      position: relative;
+      display: inline-block;
+    }
   </style>
 </head>
 <body>
-  <h2>Detección en Vivo - Motor CJ700</h2>
-  <video id="video" autoplay playsinline></video>
-  <canvas id="canvas" style="display:none;"></canvas>
-  <div id="result">Esperando cámara...</div>
+  <h2>Detección en vivo con Roboflow</h2>
+  <div id="videoWrapper">
+    <video id="video" autoplay muted playsinline></video>
+    <canvas id="overlay"></canvas>
+  </div>
+  <pre id="output"></pre>
 
   <script>
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const resultDiv = document.getElementById('result');
+    const overlay = document.getElementById('overlay');
+    const output = document.getElementById('output');
 
-    async function setupCamera() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
-      video.srcObject = stream;
+    // Acceder a la cámara
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          overlay.width = video.videoWidth;
+          overlay.height = video.videoHeight;
+          startDetection();
+        }
+      })
+      .catch(err => alert('Error al acceder a la cámara: ' + err));
 
-      return new Promise(resolve => {
-        video.onloadedmetadata = () => resolve(video);
-      });
-    }
+    const apiKey = 'Qj0G0aIWu17HtSpDZdMk';
+    const modelEndpoint = `https://detect.roboflow.com/cf700/4?api_key=${apiKey}`;
 
-    async function captureAndDetect() {
-      const ctx = canvas.getContext('2d');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      canvas.toBlob(async (blob) => {
+    async function startDetection() {
+      const ctx = overlay.getContext('2d');
+      const offscreen = document.createElement('canvas');
+      const interval = 1000; // ms
+
+      offscreen.width = overlay.width;
+      offscreen.height = overlay.height;
+      const offCtx = offscreen.getContext('2d');
+
+      setInterval(async () => {
+        offCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+        const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/jpeg'));
+
         const formData = new FormData();
-        formData.append('image', blob, 'frame.jpg');
+        formData.append('file', blob, 'frame.jpg');
 
-        // 1. Subir imagen a Roboflow para obtener una URL temporal
-        const uploadRes = await fetch('https://upload.roboflow.com?key=Qj0G0aIWu17HtSpDZdMk&name=frame', {
-          method: 'POST',
-          body: formData
-        });
+        try {
+          const res = await fetch(modelEndpoint, {
+            method: 'POST',
+            body: formData
+          });
 
-        const uploadData = await uploadRes.json();
-        if (!uploadData.url) {
-          resultDiv.innerText = "Error al subir imagen.";
-          return;
+          const data = await res.json();
+          output.textContent = JSON.stringify(data, null, 2);
+
+          ctx.clearRect(0, 0, overlay.width, overlay.height);
+          ctx.strokeStyle = 'lime';
+          ctx.lineWidth = 2;
+          ctx.font = '14px sans-serif';
+          ctx.fillStyle = 'lime';
+
+          data?.predictions?.forEach(pred => {
+            const { x, y, width, height, class: label, confidence } = pred;
+            const left = x - width / 2;
+            const top = y - height / 2;
+
+            ctx.strokeRect(left, top, width, height);
+            ctx.fillText(`${label} (${(confidence * 100).toFixed(1)}%)`, left, top - 5);
+          });
+
+        } catch (err) {
+          console.error('Error al hacer inferencia:', err);
         }
 
-        // 2. Enviar imagen al workflow
-        const detectRes = await fetch('https://serverless.roboflow.com/infer/workflows/cf700/detect-and-classify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            api_key: "Qj0G0aIWu17HtSpDZdMk",
-            inputs: {
-              image: { type: "url", value: uploadData.url }
-            }
-          })
-        });
-
-        const detectData = await detectRes.json();
-        resultDiv.innerText = JSON.stringify(detectData, null, 2);
-      }, 'image/jpeg');
+      }, interval);
     }
-
-    // Configura la cámara y comienza detecciones periódicas
-    setupCamera().then(() => {
-      resultDiv.innerText = "Cámara activa. Detectando...";
-      setInterval(captureAndDetect, 4000); // cada 4 segundos
-    });
   </script>
 </body>
 </html>
