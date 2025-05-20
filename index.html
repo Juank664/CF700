@@ -1,108 +1,68 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CF700 Visualizador</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Detector CF700</title>
   <style>
     body {
       margin: 0;
-      font-family: sans-serif;
-      background: #f0f0f0;
+      background: black;
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
+      height: 100vh;
     }
-    header {
-      background: #1f2937;
-      color: white;
+    video {
       width: 100%;
-      text-align: center;
-      padding: 1rem;
-      font-size: 1.2rem;
-    }
-    #video {
-      width: 100%;
-      max-width: 400px;
-      margin-top: 1rem;
-    }
-    #model-viewer-container {
-      width: 100%;
-      max-width: 400px;
-      height: 300px;
-      margin-top: 1rem;
-    }
-    model-viewer {
-      width: 100%;
-      height: 100%;
+      height: auto;
+      border: 2px solid #00ffcc;
+      border-radius: 12px;
     }
   </style>
-  <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-  <script src="https://unpkg.com/@roboflow/inference"></script>
 </head>
 <body>
-  <header>Visualizador CF700</header>
-
-  <!-- Cámara en vivo -->
   <video id="video" autoplay muted playsinline></video>
 
-  <!-- Modelo 3D -->
-  <div id="model-viewer-container">
-    <model-viewer id="viewer" src="" alt="Modelo 3D" auto-rotate camera-controls ar></model-viewer>
-  </div>
+  <!-- SDK CORRECTO -->
+  <script src="https://cdn.roboflow.com/0.2.26/roboflow.js"></script>
 
   <script>
-    const mapaClases = {
-      "Accessory Drive Section": "ADS.glb",
-      "After Fan": "aft_ensamble.glb",
-      "Combustion Section": "combustion_section_ensamble_cut.glb",
-      "Compressor": "compressor_ensamble_cut.glb",
-      "Drive Shaft": null,
-      "Front Frame": "Front_frame_ensamble.glb",
-      "Fuel injector": null,
-      "Turbine": "Turbine.glb"
-    };
+    const video = document.getElementById("video");
 
-    const video = document.getElementById('video');
-    const viewer = document.getElementById('viewer');
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    // Activar cámara
+    navigator.mediaDevices.getUserMedia({ video: true })
       .then(stream => {
         video.srcObject = stream;
-        runDetection();
+      })
+      .catch(err => {
+        console.error("Error accediendo a la cámara:", err);
       });
 
-    async function runDetection() {
-      const rf = new window.roboflow.Inference({
-        apiKey: "Qj0G0aIWu17HtSpDZdMk",
-        model: "cf700",
-        version: 4,
-        onInit: () => console.log("Roboflow cargado")
+    // Esperar a que cargue la página
+    window.onload = async () => {
+      const rf = await roboflow.auth({
+        publishable_key: "Qj0G0aIWu17HtSpDZdMk" // tu API Key
       });
 
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const model = await rf.load({
+        model: "cf700",  // tu model ID actualizado
+        version: 4       // versión actual
+      });
 
+      await model.configure({
+        threshold: 0.5,
+        overlap: 0.5
+      });
+
+      // Bucle de predicción
       setInterval(async () => {
-        const width = video.videoWidth;
-        const height = video.videoHeight;
-        if (!width || !height) return;
-
-        canvas.width = width;
-        canvas.height = height;
-        ctx.drawImage(video, 0, 0, width, height);
-
-        const { predictions } = await rf.detect(canvas);
-
-        if (predictions.length > 0) {
-          const clase = predictions[0].class;
-          const archivoGLB = mapaClases[clase];
-          if (archivoGLB) {
-            viewer.src = archivoGLB;
-          }
-        }
-      }, 2000);
-    }
+        const predictions = await model.detect(video);
+        console.clear();
+        console.log("Detecciones:", predictions);
+      }, 1000); // cada 1 segundo
+    };
   </script>
 </body>
 </html>
