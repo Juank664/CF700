@@ -127,8 +127,12 @@
               modelViewer.setAttribute('camera-controls', '');
               modelViewer.setAttribute('ar', '');
               modelViewer.setAttribute('shadow-intensity', '1');
-              modelsContainer.appendChild(modelViewer);
 
+              modelViewer.addEventListener('error', e => {
+                console.error(`Error al cargar modelo: ${modelFile}`, e);
+              });
+
+              modelsContainer.appendChild(modelViewer);
               shownModels.add(modelFile);
             }
           });
