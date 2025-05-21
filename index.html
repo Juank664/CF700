@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Detección en Vivo con Roboflow y Múltiples Modelos</title>
+  <title>Detección en Vivo con Roboflow y Fichas Técnicas</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <style>
     video, canvas {
@@ -32,8 +32,21 @@
       height: 300px;
       border: 2px solid #444;
     }
+    .model-card {
+      border: 1px solid #aaa;
+      padding: 10px;
+      width: 320px;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+    }
+    .model-card h3 {
+      margin: 5px 0;
+    }
+    .model-card p {
+      margin: 2px 0;
+    }
     #output {
-      display: none; /* Ocultar salida JSON */
+      display: none;
     }
   </style>
 </head>
@@ -45,27 +58,52 @@
   </div>
 
   <div id="modelsContainer"></div>
-
   <pre id="output"></pre>
 
   <script>
     const video = document.getElementById('video');
     const overlay = document.getElementById('overlay');
-    const output = document.getElementById('output');
     const modelsContainer = document.getElementById('modelsContainer');
 
     const modelMap = {
       "Accessory Drive Section": "ADS.glb",
       "After Fan": "aft_ensamble.glb",
-      "Combustion Section": "combustion_section_ensamble_cut.glb",
+      "Combustion Section": "combustion_section_ensamble_cut.gltf",
       "Compressor": "compressor_ensamble_cut.glb",
       "Drive Shaft": null,
       "Front Frame": "Front_frame_ensamble.glb",
-      "Fuel injector": "fuel_injector.glb",
+      "Fuel injector": null,
       "Turbine": "Turbine.glb"
     };
 
-    const shownModels = new Set(); // Para evitar duplicados
+    const techSpecs = {
+      "Accessory Drive Section": {
+        description: "",
+        function: ""
+      },
+      "After Fan": {
+        description: "",
+        function: ""
+      },
+      "Combustion Section": {
+        description: "",
+        function: ""
+      },
+      "Compressor": {
+        description: "",
+        function: ""
+      },
+      "Front Frame": {
+        description: "",
+        function: ""
+      },
+      "Turbine": {
+        description: "",
+        function: ""
+      }
+    };
+
+    const shownModels = new Set();
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
@@ -85,7 +123,6 @@
       const ctx = overlay.getContext('2d');
       const offscreen = document.createElement('canvas');
       const interval = 1500;
-
       offscreen.width = overlay.width;
       offscreen.height = overlay.height;
       const offCtx = offscreen.getContext('2d');
@@ -114,13 +151,14 @@
             const { x, y, width, height, class: label } = pred;
             const left = x - width / 2;
             const top = y - height / 2;
-
             ctx.strokeRect(left, top, width, height);
 
             const modelFile = modelMap[label];
             if (modelFile && !shownModels.has(modelFile)) {
-              const modelViewer = document.createElement('model-viewer');
+              const container = document.createElement('div');
+              container.className = 'model-card';
 
+              const modelViewer = document.createElement('model-viewer');
               modelViewer.setAttribute('src', modelFile);
               modelViewer.setAttribute('alt', label);
               modelViewer.setAttribute('auto-rotate', '');
@@ -128,19 +166,27 @@
               modelViewer.setAttribute('ar', '');
               modelViewer.setAttribute('shadow-intensity', '1');
 
-              modelViewer.addEventListener('error', e => {
-                console.error(`Error al cargar modelo: ${modelFile}`, e);
-              });
+              const specs = techSpecs[label];
+              if (specs) {
+                const info = document.createElement('div');
+                info.innerHTML = `
+                  <h3>${label}</h3>
+                  <p><strong>Descripción:</strong> ${specs.description}</p>
+                  <p><strong>Peso:</strong> ${specs.weight}</p>
+                  <p><strong>Material:</strong> ${specs.material}</p>
+                  <p><strong>Función:</strong> ${specs.function}</p>
+                `;
+                container.appendChild(info);
+              }
 
-              modelsContainer.appendChild(modelViewer);
+              container.appendChild(modelViewer);
+              modelsContainer.appendChild(container);
               shownModels.add(modelFile);
             }
           });
-
         } catch (err) {
           console.error('Error al hacer inferencia:', err);
         }
-
       }, interval);
     }
   </script>
