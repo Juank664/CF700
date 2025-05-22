@@ -4,61 +4,18 @@
   <meta charset="UTF-8">
   <title>Visualización de componentes de motor CF700</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
-  <style>
-    video, canvas {
-      width: 600px;
-      border: 1px solid #ccc;
-      margin: 10px;
-    }
-    #overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      z-index: 10;
-      pointer-events: none;
-    }
-    #videoWrapper {
-      position: relative;
-      display: inline-block;
-    }
-    #modelsContainer {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-top: 20px;
-    }
-    model-viewer {
-      width: 300px;
-      height: 300px;
-      border: 2px solid #444;
-    }
-    .model-card {
-      border: 1px solid #aaa;
-      padding: 10px;
-      width: 320px;
-      background-color: #f9f9f9;
-      border-radius: 8px;
-    }
-    .model-card h3 {
-      margin: 5px 0;
-    }
-    .model-card p {
-      margin: 2px 0;
-    }
-    #output {
-      display: none;
-    }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-  <h2>Modelos detectados</h2>
-  <div id="videoWrapper">
-    <video id="video" autoplay muted playsinline></video>
-    <canvas id="overlay"></canvas>
+<body class="bg-gray-100 text-gray-800 p-6">
+  <h2 class="text-3xl font-semibold text-center text-blue-800 mb-6">Componentes detectados</h2>
+
+  <div id="videoWrapper" class="flex justify-center relative mb-10">
+    <video id="video" autoplay muted playsinline class="rounded-lg border border-gray-300 shadow-lg max-w-full w-[600px]"></video>
+    <canvas id="overlay" class="absolute top-0 left-0 z-10 pointer-events-none rounded-lg"></canvas>
   </div>
 
-  <div id="modelsContainer"></div>
-  <pre id="output"></pre>
+  <div id="modelsContainer" class="flex flex-wrap justify-center gap-6"></div>
+  <pre id="output" class="hidden"></pre>
 
   <script>
     const video = document.getElementById('video');
@@ -71,14 +28,14 @@
       "Combustion Section": "combustion_section_ensamble_cut.glb",
       "Compressor": "compressor_ensamble_cut.glb",
       "Drive Shaft": null,
-      "Front Frame": "Frontframe_ensamble.glb",
+      "Front Frame": "Front_frame_ensamble.glb",
       "Fuel injector": "fuel_injector.glb",
       "Turbine": "Turbine.glb"
     };
 
     const techSpecs = {
       "Accessory Drive Section": {
-        description: "Consiste en el conjunto de accesorios, caja de engranajes de transferencia y caja de accesorios. ",
+        description: "Consiste en el conjunto de accesorios, caja de engranajes de transferencia y caja de accesorios.",
         function: "Su función es transmitir la energía del eje del motor a los accesorios del motor."
       },
       "After Fan": {
@@ -101,9 +58,9 @@
         description: "Consiste en la carcasa de turbina, envolventes, tobera del rotor y estator.",
         function: "Su principal función es extraer energía de los gases de escape producto de la combustión necesaria para impulsar el compresor y proporcionar el empuje para mover la aeronave."
       },
-      "Fuel injector":{
+      "Fuel injector": {
         description: "Doce inyectores de combustible están atornillados a doce puntos equidistantes alrededor el eje central.",
-        function: "Proporciona un patrón de pulverizaión de combustible para diferentes rangos de operación del motor.",
+        function: "Proporciona un patrón de pulverización de combustible para diferentes rangos de operación del motor."
       }
     };
 
@@ -160,7 +117,7 @@
             const modelFile = modelMap[label];
             if (modelFile && !shownModels.has(modelFile)) {
               const container = document.createElement('div');
-              container.className = 'model-card';
+              container.className = 'bg-white rounded-xl shadow-lg p-4 w-80 transition hover:shadow-xl';
 
               const modelViewer = document.createElement('model-viewer');
               modelViewer.setAttribute('src', modelFile);
@@ -169,14 +126,15 @@
               modelViewer.setAttribute('camera-controls', '');
               modelViewer.setAttribute('ar', '');
               modelViewer.setAttribute('shadow-intensity', '1');
+              modelViewer.className = 'w-full h-72 mb-4 rounded-lg';
 
               const specs = techSpecs[label];
               if (specs) {
                 const info = document.createElement('div');
                 info.innerHTML = `
-                  <h3>${label}</h3>
-                  <p><strong>Descripción:</strong> ${specs.description}</p>
-                  <p><strong>Función:</strong> ${specs.function}</p>
+                  <h3 class="text-lg font-semibold text-blue-600 mb-2">${label}</h3>
+                  <p class="text-sm mb-1"><span class="font-semibold">Descripción:</span> ${specs.description}</p>
+                  <p class="text-sm"><span class="font-semibold">Función:</span> ${specs.function}</p>
                 `;
                 container.appendChild(info);
               }
