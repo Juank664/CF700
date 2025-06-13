@@ -3,15 +3,21 @@
 <head>
   <meta charset="UTF-8">
   <title>Visualización de componentes de motor CF700</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     #videoWrapper {
       position: relative;
-      display: inline-block;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      max-width: 100%;
     }
-    #video, #overlay {
-      display: block;
+    #video {
+      width: 100%;
+      height: auto;
       border-radius: 0.5rem;
     }
     #overlay {
@@ -19,20 +25,20 @@
       top: 0;
       left: 0;
       pointer-events: none;
+      border-radius: 0.5rem;
       z-index: 10;
     }
   </style>
 </head>
-<body class="bg-gray-100 text-gray-800 p-6">
+<body class="bg-gray-100 text-gray-800 p-4">
   <h2 class="text-3xl font-semibold text-center text-blue-800 mb-6">Componentes detectados</h2>
 
-  <div id="videoWrapper" class="flex justify-center mb-10">
-    <video id="video" autoplay muted playsinline class="rounded-lg border border-gray-300 shadow-lg max-w-full w-[600px]"></video>
+  <div id="videoWrapper" class="mb-6">
+    <video id="video" autoplay muted playsinline></video>
     <canvas id="overlay"></canvas>
   </div>
 
   <div id="modelsContainer" class="flex flex-wrap justify-center gap-6"></div>
-  <pre id="output" class="hidden"></pre>
 
   <script>
     const video = document.getElementById('video');
@@ -83,6 +89,18 @@
 
     const shownModels = new Set();
 
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+      .then(stream => {
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          video.play();
+          syncOverlaySize();
+          window.addEventListener('resize', syncOverlaySize);
+          startDetection();
+        };
+      })
+      .catch(err => alert('Error al acceder a la cámara: ' + err));
+
     function syncOverlaySize() {
       const rect = video.getBoundingClientRect();
       overlay.width = rect.width;
@@ -90,16 +108,6 @@
       overlay.style.width = `${rect.width}px`;
       overlay.style.height = `${rect.height}px`;
     }
-
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-      .then(stream => {
-        video.srcObject = stream;
-        video.onloadedmetadata = () => {
-          syncOverlaySize();
-          startDetection();
-        };
-      })
-      .catch(err => alert('Error al acceder a la cámara: ' + err));
 
     const apiKey = 'Qj0G0aIWu17HtSpDZdMk';
     const modelEndpoint = `https://detect.roboflow.com/cf700/4?api_key=${apiKey}`;
@@ -111,12 +119,14 @@
       const offCtx = offscreen.getContext('2d');
 
       setInterval(async () => {
-        syncOverlaySize();
-        offscreen.width = overlay.width;
-        offscreen.height = overlay.height;
+        if (!video.videoWidth || !video.videoHeight) return;
+
+        offscreen.width = video.videoWidth;
+        offscreen.height = video.videoHeight;
         offCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
 
         const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/jpeg'));
+
         const formData = new FormData();
         formData.append('file', blob, 'frame.jpg');
 
@@ -127,22 +137,22 @@
           });
 
           const data = await res.json();
+          syncOverlaySize();
           ctx.clearRect(0, 0, overlay.width, overlay.height);
           ctx.strokeStyle = 'lime';
           ctx.lineWidth = 2;
           ctx.font = '14px sans-serif';
           ctx.fillStyle = 'lime';
 
+          const scaleX = overlay.width / video.videoWidth;
+          const scaleY = overlay.height / video.videoHeight;
+
           (data?.predictions || []).forEach(pred => {
             const { x, y, width, height, class: label } = pred;
-
-            const scaleX = overlay.width / video.videoWidth;
-            const scaleY = overlay.height / video.videoHeight;
             const left = (x - width / 2) * scaleX;
             const top = (y - height / 2) * scaleY;
             const boxWidth = width * scaleX;
             const boxHeight = height * scaleY;
-
             ctx.strokeRect(left, top, boxWidth, boxHeight);
             ctx.fillText(label, left + 4, top + 16);
 
