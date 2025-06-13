@@ -5,13 +5,30 @@
   <title>Visualización de componentes de motor CF700</title>
   <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    #videoWrapper {
+      position: relative;
+      display: inline-block;
+    }
+    #video, #overlay {
+      display: block;
+      border-radius: 0.5rem;
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+  </style>
 </head>
 <body class="bg-gray-100 text-gray-800 p-6">
   <h2 class="text-3xl font-semibold text-center text-blue-800 mb-6">Componentes detectados</h2>
 
-  <div id="videoWrapper" class="flex justify-center relative mb-10">
+  <div id="videoWrapper" class="flex justify-center mb-10">
     <video id="video" autoplay muted playsinline class="rounded-lg border border-gray-300 shadow-lg max-w-full w-[600px]"></video>
-    <canvas id="overlay" class="absolute top-0 left-0 z-10 pointer-events-none rounded-lg"></canvas>
+    <canvas id="overlay"></canvas>
   </div>
 
   <div id="modelsContainer" class="flex flex-wrap justify-center gap-6"></div>
@@ -66,12 +83,19 @@
 
     const shownModels = new Set();
 
+    function syncOverlaySize() {
+      const rect = video.getBoundingClientRect();
+      overlay.width = rect.width;
+      overlay.height = rect.height;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+    }
+
     navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
       .then(stream => {
         video.srcObject = stream;
         video.onloadedmetadata = () => {
-          overlay.width = video.videoWidth;
-          overlay.height = video.videoHeight;
+          syncOverlaySize();
           startDetection();
         };
       })
@@ -84,14 +108,15 @@
       const ctx = overlay.getContext('2d');
       const offscreen = document.createElement('canvas');
       const interval = 1500;
-      offscreen.width = overlay.width;
-      offscreen.height = overlay.height;
       const offCtx = offscreen.getContext('2d');
 
       setInterval(async () => {
+        syncOverlaySize();
+        offscreen.width = overlay.width;
+        offscreen.height = overlay.height;
         offCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
-        const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/jpeg'));
 
+        const blob = await new Promise(resolve => offscreen.toBlob(resolve, 'image/jpeg'));
         const formData = new FormData();
         formData.append('file', blob, 'frame.jpg');
 
@@ -110,9 +135,16 @@
 
           (data?.predictions || []).forEach(pred => {
             const { x, y, width, height, class: label } = pred;
-            const left = x - width / 2;
-            const top = y - height / 2;
-            ctx.strokeRect(left, top, width, height);
+
+            const scaleX = overlay.width / video.videoWidth;
+            const scaleY = overlay.height / video.videoHeight;
+            const left = (x - width / 2) * scaleX;
+            const top = (y - height / 2) * scaleY;
+            const boxWidth = width * scaleX;
+            const boxHeight = height * scaleY;
+
+            ctx.strokeRect(left, top, boxWidth, boxHeight);
+            ctx.fillText(label, left + 4, top + 16);
 
             const modelFile = modelMap[label];
             if (modelFile && !shownModels.has(modelFile)) {
